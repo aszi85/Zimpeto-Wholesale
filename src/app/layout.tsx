@@ -14,10 +14,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt">
-      <body className="bg-[#f2f2f2] min-h-screen">
+      <body className="bg-[#f2f2f2] min-h-screen w-full overflow-x-hidden">
         <CartProvider>
           <Navbar />
-          <main>{children}</main>
+          <main className="w-full px-4 md:px-8 lg:px-16">
+            {children}
+          </main>
           <Footer />
           <CartSidebar />
           <AddToCartPopup />
