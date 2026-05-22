@@ -45,7 +45,6 @@ export default function Footer() {
             <ul className="space-y-2">
               {[
                 { label: 'Contacto', href: '/contacto' },
-                { label: 'Login / Conta', href: '/login' },
               ].map(l => (
                 <li key={l.href}>
                   <button onClick={() => router.push(l.href)} className="text-[11px] text-gray-400 hover:text-white transition-colors">
@@ -69,7 +68,7 @@ export default function Footer() {
         <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <p className="text-[10px] text-gray-600 font-medium">© {new Date().getFullYear()} Zimpeto Wholesale LDA.</p>
           <div className="flex flex-wrap justify-center gap-4">
-            {['M-Pesa', 'Millennium BIM', 'Transferência Bancária'].map((m) => (
+            {['M-Pesa'].map((m) => (
               <span key={m} className="text-[10px] text-gray-600 font-medium">{m}</span>
             ))}
           </div>
