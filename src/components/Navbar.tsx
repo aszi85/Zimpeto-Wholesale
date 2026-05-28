@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/context/CartContext';  // <-- FIXED PATH
 import { ALL_PRODUCTS } from '@/data';
-import Subnav from '@/components/Subnav';
+import Subnav from '@/components/subnav';
 
 export default function Navbar() {
   const { cartCount, setIsCartOpen } = useCart();
