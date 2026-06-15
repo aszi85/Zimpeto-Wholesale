@@ -110,7 +110,7 @@
           <thead>
             <tr class="bg-gray-100 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500">
               <th class="px-6 py-3">Nº</th>
-              <th class="px-6 py-3">UUID do Visitante</th>
+              <th class="px-6 py-3">ID do Visitante</th>
               <th class="px-6 py-3">Dispositivo</th>
               <th class="px-6 py-3">Browser</th>
               <th class="px-6 py-3">Localização</th>
@@ -257,7 +257,7 @@
       refreshSpinner.classList.remove('hidden');
       
       try {
-        // Fetch up to 50 visitors sorted by creation
+        // Fetch visitors sorted by creation
         const { data: visitors, error } = await supabaseClient
           .from('visitors')
           .select('*')
@@ -270,13 +270,26 @@
           return;
         }
 
+        // Filter unique visitors by their 6-digit prefix to ensure uniqueness, up to 10
+        const uniqueVisitors = [];
+        const seenIds = new Set();
+        
+        for (const v of visitors || []) {
+          const shortId = (v.id || '').substring(0, 6);
+          if (shortId && !seenIds.has(shortId)) {
+            seenIds.add(shortId);
+            uniqueVisitors.push(v);
+          }
+          if (uniqueVisitors.length >= 10) break;
+        }
+
         // Render rows
         visitorsTableBody.innerHTML = '';
         let totalDuration = 0;
         let activeNowCount = 0;
         const locations = {};
 
-        visitors.forEach((v, index) => {
+        uniqueVisitors.forEach((v, index) => {
           // Calculate session time duration
           const start = new Date(v.session_start);
           const end = v.session_end ? new Date(v.session_end) : new Date(v.created_at);
@@ -326,11 +339,13 @@
             ? `<span class="inline-flex items-center text-emerald-600 font-bold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>Activo</span>`
             : `<span class="text-gray-400 font-medium">Inactivo</span>`;
 
+          const shortId = v.id.substring(0, 6);
+
           const row = document.createElement('tr');
           row.className = 'hover:bg-gray-50 transition-colors border-b border-gray-200';
           row.innerHTML = `
             <td class="px-6 py-4 font-bold text-gray-500">${index + 1}</td>
-            <td class="px-6 py-4 font-mono text-gray-650 tracking-wider">${v.id}</td>
+            <td class="px-6 py-4 font-mono text-gray-650 tracking-wider">${shortId}</td>
             <td class="px-6 py-4">${deviceBadge(v.device)}</td>
             <td class="px-6 py-4 font-semibold text-gray-800">${v.browser || '-'}</td>
             <td class="px-6 py-4 text-gray-700 font-medium">${v.location || 'Desconhecido'}</td>
@@ -343,7 +358,7 @@
         });
 
         // Update stats
-        const count = visitors.length;
+        const count = uniqueVisitors.length;
         totalCountEl.textContent = count;
         activeCountEl.textContent = activeNowCount;
         

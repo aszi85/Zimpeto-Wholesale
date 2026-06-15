@@ -5,16 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 // @ts-ignore
 import { supabase as defaultSupabase } from '../../supabase.js';
 
-// Helper to generate a compliant UUID
+// Helper to generate a compliant UUID with 6 random numeric digits and padding
 function generateUUID(): string {
-  if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
-    return window.crypto.randomUUID();
+  let numStr = '';
+  for (let i = 0; i < 6; i++) {
+    numStr += Math.floor(Math.random() * 10).toString();
   }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
+  return `${numStr}00-0000-4000-8000-000000000000`;
 }
 
 // Get or create visitor ID in sessionStorage
