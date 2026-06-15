@@ -1,81 +1,346 @@
 'use client';
+
 import { useState } from 'react';
+// @ts-ignore
+import { supabase } from '../../../supabase.js';
+import { useCart } from '../context/CartContext';
 
 export default function ContactoPage() {
-  const [sent, setSent] = useState(false);
-  const [form, setForm] = useState({ nome: '', email: '', mensagem: '' });
+  const { t } = useCart();
+  const [screen, setScreen] = useState<'form' | 'otp' | 'success'>('form');
+  
+  // Form Data
+  const [fullName, setFullName] = useState('');
+  const [emailAddress, setEmailAddress] = useState('');
+  const [message, setMessage] = useState('');
+  
+  // OTP Verification
+  const [otpCode, setOtpCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
+  
+  // Local testing helper (displays code if Resend is not configured)
+  const [testOtp, setTestOtp] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Submit Contact Form - Sends OTP
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
+    setLoading(true);
+    setErrorMsg('');
+    setInfoMsg('');
+    setTestOtp(null);
+
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: emailAddress }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Falha ao enviar código de verificação.');
+      }
+
+      // If API ran in local testing mode, save the code to show it
+      if (data.testMode && data.code) {
+        setTestOtp(data.code);
+      }
+
+      setScreen('otp');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Ocorreu um erro. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Verify OTP Code
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      setErrorMsg('O código OTP deve ter 6 dígitos.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      if (!supabase) {
+        throw new Error('Cliente do banco de dados não configurado.');
+      }
+
+      // 1. Query the otps table for a valid match
+      const now = new Date().toISOString();
+      const { data: matchedOtp, error: fetchError } = await supabase
+        .from('otps')
+        .select('*')
+        .eq('email', emailAddress)
+        .eq('code', otpCode)
+        .eq('used', false)
+        .gt('expires_at', now)
+        .maybeSingle();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (!matchedOtp) {
+        throw new Error('Código incorreto, já utilizado ou expirado.');
+      }
+
+      // 2. Mark the OTP code as used
+      const { error: updateError } = await supabase
+        .from('otps')
+        .update({ used: true })
+        .eq('email', emailAddress)
+        .eq('code', otpCode);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // 3. Success state
+      setScreen('success');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao verificar o código. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resend OTP Code
+  const handleResendOtp = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    setInfoMsg('');
+    setTestOtp(null);
+
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: emailAddress }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Falha ao reenviar código.');
+      }
+
+      if (data.testMode && data.code) {
+        setTestOtp(data.code);
+      }
+
+      setInfoMsg('Novo código enviado com sucesso!');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao reenviar. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-16 pb-24">
-      <div className="mb-10">
-        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9800] mb-2">Fale Connosco</div>
-        <h1 className="text-4xl font-black text-[#004d40] uppercase italic tracking-tighter">Contactos</h1>
-        <p className="text-black mt-2 font-medium">Apoio ao cliente • Maputo & Matola</p>
-      </div>
+    <main className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      
+      {/* Centered Professional Card Container */}
+      <div className="w-full max-w-md bg-white border border-gray-200 rounded-sm shadow-xl p-8 border-t-4 border-[#004d40] transition-all duration-300">
+        
+        {/* Title */}
+        <div className="text-center mb-8">
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9800] mb-1">{t('catalog_wholesale')}</div>
+          <h2 className="text-2xl font-black uppercase italic tracking-tighter text-[#004d40]">{t('contact_title')}</h2>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        <div className="space-y-8">
-          {[
-            { title: 'Localização', icon: 'M12 21s-8-7.5-8-12a8 8 0 1 1 16 0c0 4.5-8 12-8 12z', lines: ['Mercado do Zimpeto, Bancada 42-B', 'Maputo, Moçambique'] },
-            { title: 'WhatsApp / Chamadas', icon: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z', lines: ['+258 84 123 4567', 'Segunda – Sábado: 7h – 18h'] },
-            { title: 'Email', icon: 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z', lines: ['zimpeto@wholesale.co.mz'] },
-            { title: 'Horário de Funcionamento', icon: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z M12 6v6l4 2', lines: ['Segunda a Sexta: 7h – 17h30', 'Sábado: 7h – 14h', 'Domingo: Fechado'] },
-          ].map(item => (
-            <div key={item.title} className="flex gap-4">
-              <div className="w-10 h-10 bg-[#f0faf7] border border-[#004d40]/10 flex items-center justify-center rounded flex-shrink-0">
-                <svg className="w-5 h-5 text-[#004d40]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={item.icon} /></svg>
-              </div>
-              <div>
-                <h4 className="font-black uppercase text-[10px] tracking-widest mb-1 text-[#004d40]">{item.title}</h4>
-                {item.lines.map(l => (
-                  <p key={l} className="text-sm font-medium text-black leading-relaxed">{l}</p>
-                ))}
-              </div>
+        {/* ==================== SCREEN 1: FORM ==================== */}
+        {screen === 'form' && (
+          <form onSubmit={handleFormSubmit} className="space-y-6">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-black block mb-2">
+                {t('full_name_label')}
+              </label>
+              <input
+                required
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full border border-gray-200 focus:border-[#ff9800] px-4 py-3 text-sm outline-none transition-colors font-medium placeholder:text-gray-400"
+                placeholder={t('full_name_placeholder')}
+              />
             </div>
-          ))}
 
-          <div className="bg-white rounded-sm h-40 flex items-center justify-center border border-black">
-            <a href="#" className="text-[#004d40] font-black text-[11px] uppercase tracking-widest hover:text-[#ff9800] transition-colors">
-              Ver no Google Maps
-            </a>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-black block mb-2">
+                {t('email_label')}
+              </label>
+              <input
+                required
+                type="email"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                className="w-full border border-gray-200 focus:border-[#ff9800] px-4 py-3 text-sm outline-none transition-colors font-medium placeholder:text-gray-400"
+                placeholder={t('email_placeholder')}
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-black block mb-2">
+                {t('message_label')}
+              </label>
+              <textarea
+                required
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="w-full border border-gray-200 focus:border-[#ff9800] px-4 py-3 text-sm outline-none transition-colors font-medium resize-none placeholder:text-gray-400"
+                placeholder={t('message_placeholder')}
+              />
+            </div>
+
+            {errorMsg && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold p-3 rounded-sm">
+                {errorMsg}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#004d40] text-white py-4 font-black uppercase text-[11px] tracking-[0.15em] hover:bg-[#ff9800] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  {t('processing_btn')}
+                </>
+              ) : (
+                t('send_message_btn')
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* ==================== SCREEN 2: OTP INPUT ==================== */}
+        {screen === 'otp' && (
+          <form onSubmit={handleVerifyOtp} className="space-y-6">
+            <p className="text-sm font-medium text-center text-gray-600 mb-6">
+              {t('otp_sent_msg')} <span className="font-bold text-black">{emailAddress}</span>.
+            </p>
+
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-black block mb-2 text-center">
+                {t('otp_enter_label')}
+              </label>
+              <input
+                required
+                type="text"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full border-2 border-dashed border-gray-300 focus:border-[#004d40] px-4 py-4 text-center text-2xl font-bold tracking-[0.5em] outline-none transition-colors"
+                placeholder="000000"
+              />
+            </div>
+
+            {errorMsg && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold p-3 rounded-sm text-center">
+                {errorMsg}
+              </div>
+            )}
+
+            {infoMsg && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold p-3 rounded-sm text-center">
+                {infoMsg}
+              </div>
+            )}
+
+            {/* Test Mode helper widget */}
+            {testOtp && (
+              <div className="bg-gray-100 border border-gray-200 text-gray-700 text-xs p-3 rounded-sm text-center">
+                <span className="font-bold uppercase text-[9px] text-gray-500 block mb-1">{t('test_mode_active')}</span>
+                {t('code_generated')}: <strong className="text-black text-sm tracking-wider font-mono bg-white px-2 py-0.5 border rounded-sm">{testOtp}</strong>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#004d40] text-white py-4 font-black uppercase text-[11px] tracking-[0.15em] hover:bg-[#ff9800] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  {t('verifying_btn')}
+                </>
+              ) : (
+                t('confirm_code_btn')
+              )}
+            </button>
+
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={loading}
+                className="text-[10px] font-black uppercase text-[#ff9800] hover:underline"
+              >
+                {t('resend_code_btn')}
+              </button>
+            </div>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setScreen('form')}
+                className="text-[10px] font-black uppercase text-gray-400 hover:text-gray-600"
+              >
+                {t('back_form_btn')}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ==================== SCREEN 3: SUCCESS ==================== */}
+        {screen === 'success' && (
+          <div className="text-center py-8 space-y-6 animate-fadeIn">
+            <div className="w-16 h-16 bg-emerald-100 border border-emerald-200 text-[#004d40] rounded-full flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-black text-[#004d40] uppercase italic tracking-tighter mb-2">
+                {t('verification_completed')}
+              </h3>
+              <p className="text-sm font-medium text-black">
+                {t('message_sent_success')}
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setFullName('');
+                setEmailAddress('');
+                setMessage('');
+                setScreen('form');
+                setErrorMsg('');
+                setInfoMsg('');
+                setTestOtp(null);
+              }}
+              className="mt-6 text-[10px] font-black uppercase text-[#ff9800] hover:underline"
+            >
+              {t('send_another_msg')}
+            </button>
           </div>
-        </div>
+        )}
 
-        <div className="bg-white p-8 border-t-4 border-[#004d40] shadow-sm">
-          {sent ? (
-            <div className="text-center py-10">
-              <h3 className="font-black text-[#004d40] uppercase italic mb-2">Mensagem Enviada</h3>
-              <p className="text-black text-sm font-medium">Responderemos em breve.</p>
-              <button onClick={() => setSent(false)} className="mt-6 text-[10px] font-black uppercase text-[#ff9800] hover:underline">
-                Enviar outra mensagem
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <h3 className="text-xl font-black text-[#004d40] uppercase italic tracking-tighter mb-6">Envie uma Mensagem</h3>
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.15em] text-black block mb-1">Nome *</label>
-                <input required type="text" value={form.nome} onChange={e => setForm(p => ({ ...p, nome: e.target.value }))} className="w-full border-b-2 border-black focus:border-[#ff9800] py-3 text-[13px] outline-none transition-colors font-medium placeholder:text-black" placeholder="O seu nome" />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.15em] text-black block mb-1">Email ou Telemóvel *</label>
-                <input required type="text" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="w-full border-b-2 border-black focus:border-[#ff9800] py-3 text-[13px] outline-none transition-colors font-medium placeholder:text-black" placeholder="email@exemplo.com ou 84 000 0000" />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.15em] text-black block mb-1">Mensagem *</label>
-                <textarea required rows={4} value={form.mensagem} onChange={e => setForm(p => ({ ...p, mensagem: e.target.value }))} className="w-full border-b-2 border-black focus:border-[#ff9800] py-3 text-[13px] outline-none transition-colors font-medium resize-none placeholder:text-black" placeholder="Como podemos ajudar?" />
-              </div>
-              <button type="submit" className="w-full bg-[#004d40] text-white py-4 font-black uppercase text-[11px] tracking-[0.15em] hover:bg-[#ff9800] transition-colors">
-                Enviar Mensagem
-              </button>
-            </form>
-          )}
-        </div>
       </div>
     </main>
   );

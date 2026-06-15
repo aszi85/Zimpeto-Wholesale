@@ -4,7 +4,7 @@ import { useCart } from '../app/context/CartContext';
 import { Product } from '../app/context/CartContext';
 
 export default function AddToCartPopup() {
-  const { popupProduct, setPopupProduct, addToCart } = useCart();
+  const { popupProduct, setPopupProduct, addToCart, t } = useCart();
   const [qty, setQty] = useState(1);
   const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
   const [added, setAdded] = useState(false);
@@ -70,7 +70,7 @@ export default function AddToCartPopup() {
         {/* Product Hero */}
         <div className="flex gap-4 p-5 border-b border-gray-100 bg-gray-50">
           <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
-            <img src={popupProduct.img} alt={popupProduct.name} className="w-full h-full object-cover" />
+            <img src={popupProduct.img} alt={t(popupProduct.name)} className="w-full h-full object-cover" />
           </div>
           <div className="flex-1 min-w-0">
             {popupProduct.tag && (
@@ -79,7 +79,7 @@ export default function AddToCartPopup() {
               </span>
             )}
             <h3 className="font-black text-[13px] text-gray-800 uppercase tracking-wide leading-snug mb-2">
-              {popupProduct.name}
+              {t(popupProduct.name)}
             </h3>
             <div className="flex items-baseline gap-2">
               <span className="text-xl font-black text-[#004d40]">{popupProduct.price.toLocaleString('pt-MZ')} MT</span>

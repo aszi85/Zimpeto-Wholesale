@@ -3,7 +3,7 @@ import { useCart } from '../app/context/CartContext';
 import { useRouter } from 'next/navigation';
 
 export default function CartSidebar() {
-  const { cart, isCartOpen, setIsCartOpen, cartTotal, cartCount, updateQuantity, removeFromCart } = useCart();
+  const { cart, isCartOpen, setIsCartOpen, cartTotal, cartCount, updateQuantity, removeFromCart, t } = useCart();
   const router = useRouter();
 
   if (!isCartOpen) return null;
@@ -47,10 +47,10 @@ export default function CartSidebar() {
               {cart.map(item => (
                 <div key={item.id} className="flex gap-3 p-4 hover:bg-gray-50 transition-colors">
                   <div className="w-16 h-16 rounded flex-shrink-0 overflow-hidden border border-gray-100">
-                    <img src={item.img} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={item.img} alt={t(item.name)} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-gray-700 leading-snug mb-1 truncate">{item.name}</p>
+                    <p className="text-[10px] font-black uppercase tracking-wide text-gray-700 leading-snug mb-1 truncate">{t(item.name)}</p>
                     <p className="text-[11px] font-black text-[#004d40] mb-2">{(item.price * item.qtd).toLocaleString('pt-MZ')} MT</p>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center border border-gray-200 rounded-sm overflow-hidden">

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Obrigado pela sua Encomenda | Zimpeto Wholesale</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex items-center justify-center p-4">
+  
+  <div class="w-full max-w-2xl bg-white border border-gray-200 rounded-sm shadow-xl p-8 border-t-4 border-[#004d40]">
+    
+    <!-- Success Icon & Message -->
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 bg-emerald-50 border border-emerald-100 text-[#004d40] rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <div class="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9800] mb-1">Zimpeto Wholesale</div>
+      <h2 class="text-2xl font-black uppercase italic tracking-tighter text-[#004d40]">Encomenda Recebida!</h2>
+      <p class="text-gray-500 text-sm mt-2">Agradecemos a sua preferência. O recibo da sua encomenda foi enviado por email.</p>
+    </div>
+
+    <!-- Order Loader / Error Container -->
+    <div id="loader" class="text-center py-6 text-gray-500 text-sm font-semibold">
+      Carregando os detalhes da encomenda...
+    </div>
+
+    <div id="errorMessage" class="hidden bg-red-50 border border-red-200 text-red-700 text-xs p-4 rounded-sm text-center mb-6">
+      Não foi possível carregar os detalhes da encomenda. Verifique se o código é válido.
+    </div>
+
+    <!-- Main Receipt Summary (Hidden initially) -->
+    <div id="receiptContainer" class="hidden space-y-6">
+      
+      <!-- Order ID and Date Panel -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 p-4 border rounded-sm text-xs gap-2">
+        <div>
+          <span class="text-gray-400 font-bold uppercase tracking-wider block mb-1">Código Encomenda:</span>
+          <span id="orderIdText" class="font-mono text-black font-semibold text-sm"></span>
+        </div>
+        <div class="sm:text-right">
+          <span class="text-gray-400 font-bold uppercase tracking-wider block mb-1">Data de Emissão:</span>
+          <span id="orderDateText" class="font-semibold text-black"></span>
+        </div>
+      </div>
+
+      <!-- Customer and Address Panel -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 border rounded-sm text-xs">
+        <div>
+          <h4 class="text-[#004d40] font-black uppercase text-[10px] tracking-wider mb-2">Dados do Destinatário</h4>
+          <p class="font-semibold text-black mb-1" id="custNameText"></p>
+          <p class="text-gray-650 text-gray-600" id="custPhoneText"></p>
+          <p class="text-gray-650 text-gray-600" id="custEmailText"></p>
+        </div>
+        <div>
+          <h4 class="text-[#004d40] font-black uppercase text-[10px] tracking-wider mb-2">Local de Envio / Levantamento</h4>
+          <p class="text-gray-700 font-medium leading-relaxed" id="custAddressText"></p>
+          <div class="mt-2 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+            <span class="font-bold uppercase text-[9px] text-[#ff9800]" id="orderStatusBadge">Pendente</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Items Breakdown Table -->
+      <div>
+        <h4 class="text-[#004d40] font-black uppercase text-[10px] tracking-wider mb-3">Resumo dos Artigos</h4>
+        <div class="border rounded-sm overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-gray-100 border-b font-bold uppercase tracking-wider text-gray-500">
+                <th class="px-4 py-3">Produto</th>
+                <th class="px-4 py-3 text-center">Preço Unitário</th>
+                <th class="px-4 py-3 text-center">Quantidade</th>
+                <th class="px-4 py-3 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="itemsTableBody" class="divide-y text-gray-750">
+              <!-- Dynamically populated -->
+            </tbody>
+            <tfoot>
+              <tr class="bg-gray-50 font-black text-sm">
+                <td colspan="3" class="px-4 py-4 text-[#004d40] uppercase">Total Pago / A Pagar</td>
+                <td id="orderTotalText" class="px-4 py-4 text-right text-base text-[#004d40] italic">0 MT</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bank / Checkout Instructions -->
+      <div class="bg-emerald-50 border border-emerald-250 border-emerald-100 rounded-sm p-4 text-xs text-emerald-800 space-y-1.5">
+        <h5 class="font-bold uppercase tracking-wider text-[#004d40]">Instruções Importantes:</h5>
+        <p>A nossa equipa já recebeu a sua encomenda. Iremos telefonar-lhe em breve para confirmar a hora de entrega ou preparar o levantamento na nossa bancada no Zimpeto.</p>
+        <p class="font-medium">Obrigado por comprar no Zimpeto Wholesale!</p>
+      </div>
+
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center mt-8 border-t pt-6">
+      <a href="/" class="inline-block bg-[#004d40] text-white px-8 py-3.5 font-black uppercase text-[11px] tracking-widest hover:bg-[#ff9800] transition-colors rounded-sm shadow-md">
+        Voltar ao Início
+      </a>
+    </div>
+
+  </div>
+
+  <script>
+    // Supabase Credentials
+    const supabaseUrl = 'https://shrxdweuypdqzoszrlwf.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNocnhkd2V1eXBkcXpvc3pybHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODc0NTQsImV4cCI6MjA5Njc2MzQ1NH0.4kraFDQdgPzVvkcb4CXMujw8ICT0fq6ybnjzOQCKwc4';
+
+    // Elements
+    const loader = document.getElementById('loader');
+    const errorMessage = document.getElementById('errorMessage');
+    const receiptContainer = document.getElementById('receiptContainer');
+    const orderIdText = document.getElementById('orderIdText');
+    const orderDateText = document.getElementById('orderDateText');
+    const custNameText = document.getElementById('custNameText');
+    const custPhoneText = document.getElementById('custPhoneText');
+    const custEmailText = document.getElementById('custEmailText');
+    const custAddressText = document.getElementById('custAddressText');
+    const orderStatusBadge = document.getElementById('orderStatusBadge');
+    const itemsTableBody = document.getElementById('itemsTableBody');
+    const orderTotalText = document.getElementById('orderTotalText');
+
+    async function fetchOrderDetails() {
+      // Parse orderId from query string
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderId = urlParams.get('orderId');
+
+      if (!orderId) {
+        loader.classList.add('hidden');
+        errorMessage.classList.remove('hidden');
+        errorMessage.textContent = 'Erro: Nenhum código de encomenda foi fornecido na hiperligação.';
+        return;
+      }
+
+      try {
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+        
+        // Fetch order details
+        const { data: order, error } = await supabaseClient
+          .from('orders')
+          .select('*')
+          .eq('id', orderId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!order) {
+          loader.classList.add('hidden');
+          errorMessage.classList.remove('hidden');
+          errorMessage.textContent = 'FALHA: A encomenda especificada não foi encontrada na Base de Dados.';
+          return;
+        }
+
+        // Populate header details
+        orderIdText.textContent = order.id;
+        const orderDate = new Date(order.created_at);
+        orderDateText.textContent = orderDate.toLocaleTimeString('pt-PT') + ' ' + orderDate.toLocaleDateString('pt-PT');
+        
+        // Populate customer panel
+        custNameText.textContent = order.customer_name;
+        custPhoneText.textContent = 'Telefone: ' + (order.phone || '-');
+        custEmailText.textContent = 'Email: ' + (order.email || '-');
+        custAddressText.textContent = order.address;
+        
+        // Status Badge
+        orderStatusBadge.textContent = order.status;
+        const statusMap = {
+          'pending': 'Pendente (Aguardando Confirmação)',
+          'processing': 'Processando',
+          'delivered': 'Entregue / Concluído',
+          'cancelled': 'Cancelado'
+        };
+        orderStatusBadge.textContent = statusMap[order.status] || order.status;
+
+        // Render products
+        itemsTableBody.innerHTML = '';
+        const items = order.items || [];
+        items.forEach(item => {
+          const row = document.createElement('tr');
+          row.className = 'border-b hover:bg-gray-50 transition-colors';
+          row.innerHTML = `
+            <td class="px-4 py-3 font-semibold text-gray-800">${item.name}</td>
+            <td class="px-4 py-3 text-center text-gray-500">${item.price.toLocaleString('pt-MZ')} MT</td>
+            <td class="px-4 py-3 text-center font-bold text-gray-700">x${item.qtd}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-900">${(item.price * item.qtd).toLocaleString('pt-MZ')} MT</td>
+          `;
+          itemsTableBody.appendChild(row);
+        });
+
+        // Total
+        orderTotalText.textContent = order.total_price.toLocaleString('pt-MZ') + ' MT';
+
+        // Display
+        loader.classList.add('hidden');
+        receiptContainer.classList.remove('hidden');
+
+      } catch (err) {
+        console.error('Failed to load order:', err);
+        loader.classList.add('hidden');
+        errorMessage.classList.remove('hidden');
+        errorMessage.textContent = 'Erro ao conectar à Base de Dados: ' + err.message;
+      }
+    }
+
+    // Run on mount
+    fetchOrderDetails();
+  </script>
+</body>
+</html>

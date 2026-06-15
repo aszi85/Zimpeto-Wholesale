@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Administração | Zimpeto Analytics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <script>
+    (function() {
+      const savedUser = localStorage.getItem('zimpeto_user_email');
+      const isAdmin = !!savedUser && savedUser.toLowerCase().includes('admin');
+      if (!isAdmin) {
+        window.location.href = '/login';
+      }
+    })();
+  </script>
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 min-h-screen">
+  
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-800 pb-6 mb-8 gap-4">
+      <div>
+        <div class="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9800] mb-1">Zimpeto Wholesale</div>
+        <h1 class="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 uppercase italic">
+          Visitor Analytics
+        </h1>
+        <p class="text-gray-400 text-sm mt-1">Registo de visitantes únicos (Máx 10)</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="refreshBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded text-xs transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4 animate-spin hidden" id="refreshSpinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+          Actualizar
+        </button>
+        <button id="settingsBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2 px-4 rounded text-xs transition-colors">
+          Configurar BD
+        </button>
+      </div>
+    </header>
+
+    <!-- Credentials Config Modal/Overlay (Toggled by Button) -->
+    <div id="credentialsModal" class="hidden mb-8 p-6 bg-gray-900 border border-gray-800 rounded-lg shadow-xl animate-fadeIn">
+      <h3 class="text-lg font-bold text-[#ff9800] mb-3 uppercase tracking-wider">Configuração do Supabase</h3>
+      <p class="text-gray-400 text-xs mb-4">Insira os dados de conexão do seu projecto Supabase abaixo. Estes dados serão guardados localmente no seu browser (localStorage) para permitir o carregamento imediato do painel.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Supabase URL</label>
+          <input type="text" id="supabaseUrlInput" class="w-full bg-gray-800 border border-gray-750 text-white py-2 px-3 rounded text-sm outline-none focus:border-emerald-500" placeholder="https://xxxx.supabase.co">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Supabase Anon Key</label>
+          <input type="password" id="supabaseAnonKeyInput" class="w-full bg-gray-800 border border-gray-750 text-white py-2 px-3 rounded text-sm outline-none focus:border-emerald-500" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button id="saveCredentialsBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded text-xs transition-colors">
+          Guardar Configuração
+        </button>
+        <button id="clearCredentialsBtn" class="bg-red-900 hover:bg-red-800 text-red-100 font-bold py-2 px-4 rounded text-xs transition-colors">
+          Limpar
+        </button>
+      </div>
+    </div>
+
+    <!-- Connection Error Alert -->
+    <div id="connectionAlert" class="hidden mb-8 p-4 bg-yellow-900/30 border border-yellow-700/50 rounded-lg text-yellow-200 text-xs">
+      <p class="font-bold mb-1 uppercase tracking-wider">Database não configurada ou inacessível</p>
+      <p class="mb-2">Por favor, clique em <b>"Configurar BD"</b> no canto superior direito para inserir o URL e Anon Key do seu projecto Supabase.</p>
+      <p>Além disso, certifique-se de que correu o script SQL de criação da tabela <b>"visitors"</b> no seu painel da Supabase.</p>
+    </div>
+
+    <!-- Stats Panel -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="bg-gray-900 border border-gray-800 p-5 rounded-lg flex flex-col justify-between">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Visitantes Registados</span>
+        <div class="flex items-baseline gap-2 mt-2">
+          <span class="text-3xl font-black text-white" id="totalCount">0</span>
+          <span class="text-xs text-gray-400">/ 10</span>
+        </div>
+        <div class="w-full bg-gray-800 h-1.5 rounded-full mt-3 overflow-hidden">
+          <div id="progressBar" class="bg-gradient-to-r from-emerald-500 to-teal-300 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 p-5 rounded-lg">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Activos Agora</span>
+        <span class="text-3xl font-black text-emerald-400 block mt-2" id="activeCount">0</span>
+        <span class="text-[10px] text-gray-400 mt-2 block">Sessões activas nos últimos 30 segundos</span>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 p-5 rounded-lg">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Tempo Médio no Site</span>
+        <span class="text-3xl font-black text-[#ff9800] block mt-2" id="avgDuration">0s</span>
+        <span class="text-[10px] text-gray-400 mt-2 block">Duração média de navegação</span>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 p-5 rounded-lg">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Principais Origens</span>
+        <span class="text-lg font-bold text-white block mt-2 truncate" id="topLocation">A carregar...</span>
+        <span class="text-[10px] text-gray-400 mt-2 block">Cidade com mais acessos</span>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden shadow-xl">
+      <div class="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
+        <h2 class="text-sm font-black uppercase tracking-wider text-white">Lista de Visitantes</h2>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-950 text-emerald-300 border border-emerald-800/50">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>
+          Auto-refresh (5s)
+        </span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-950/50 border-b border-gray-800 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <th class="px-6 py-3">Nº</th>
+              <th class="px-6 py-3">UUID do Visitante</th>
+              <th class="px-6 py-3">Dispositivo</th>
+              <th class="px-6 py-3">Browser</th>
+              <th class="px-6 py-3">Localização</th>
+              <th class="px-6 py-3">Início da Sessão</th>
+              <th class="px-6 py-3">Último Acesso (Fim)</th>
+              <th class="px-6 py-3">Duração</th>
+              <th class="px-6 py-3">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="visitorsTableBody" class="divide-y divide-gray-800 text-xs">
+            <tr>
+              <td colspan="9" class="px-6 py-12 text-center text-gray-500 font-medium">
+                Carregando dados dos visitantes...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let supabaseClient = null;
+
+    // Default placeholders
+    let defaultUrl = 'https://shrxdweuypdqzoszrlwf.supabase.co';
+    let defaultAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNocnhkd2V1eXBkcXpvc3pybHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODc0NTQsImV4cCI6MjA5Njc2MzQ1NH0.4kraFDQdgPzVvkcb4CXMujw8ICT0fq6ybnjzOQCKwc4';
+
+    // UI Elements
+    const credentialsModal = document.getElementById('credentialsModal');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const saveCredentialsBtn = document.getElementById('saveCredentialsBtn');
+    const clearCredentialsBtn = document.getElementById('clearCredentialsBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const refreshSpinner = document.getElementById('refreshSpinner');
+    const connectionAlert = document.getElementById('connectionAlert');
+    const supabaseUrlInput = document.getElementById('supabaseUrlInput');
+    const supabaseAnonKeyInput = document.getElementById('supabaseAnonKeyInput');
+    
+    const visitorsTableBody = document.getElementById('visitorsTableBody');
+    const totalCountEl = document.getElementById('totalCount');
+    const activeCountEl = document.getElementById('activeCount');
+    const avgDurationEl = document.getElementById('avgDuration');
+    const topLocationEl = document.getElementById('topLocation');
+    const progressBar = document.getElementById('progressBar');
+
+    // Toggle credentials modal
+    settingsBtn.addEventListener('click', () => {
+      credentialsModal.classList.toggle('hidden');
+    });
+
+    // Save credentials to localStorage
+    saveCredentialsBtn.addEventListener('click', () => {
+      const url = supabaseUrlInput.value.trim();
+      const key = supabaseAnonKeyInput.value.trim();
+      
+      if (url && key) {
+        localStorage.setItem('local_supabase_url', url);
+        localStorage.setItem('local_supabase_anon_key', key);
+        credentialsModal.classList.add('hidden');
+        initSupabaseAndLoad();
+      }
+    });
+
+    // Clear credentials
+    clearCredentialsBtn.addEventListener('click', () => {
+      localStorage.removeItem('local_supabase_url');
+      localStorage.removeItem('local_supabase_anon_key');
+      supabaseUrlInput.value = '';
+      supabaseAnonKeyInput.value = '';
+      supabaseClient = null;
+      connectionAlert.classList.remove('hidden');
+      renderEmptyTable("Configuração limpa. Por favor introduza novas credenciais.");
+    });
+
+    // Manual Refresh button
+    refreshBtn.addEventListener('click', () => {
+      loadVisitorsData();
+    });
+
+    // Try initializing Supabase from localStorage or hardcoded placeholders
+    function initSupabaseAndLoad() {
+      // 1. Check local storage
+      let url = localStorage.getItem('local_supabase_url');
+      let key = localStorage.getItem('local_supabase_anon_key');
+
+      // 2. Fallback to hardcoded details if they don't contain placeholders
+      if (!url || url.includes('PASTE')) {
+        url = defaultUrl;
+      }
+      if (!key || key.includes('PASTE')) {
+        key = defaultAnonKey;
+      }
+
+      // Populate input values
+      if (url && !url.includes('PASTE')) supabaseUrlInput.value = url;
+      if (key && !key.includes('PASTE')) supabaseAnonKeyInput.value = key;
+
+      // Validate URL format
+      let isValid = false;
+      try {
+        if (url && !url.includes('PASTE')) {
+          new URL(url);
+          isValid = true;
+        }
+      } catch (_) {}
+
+      if (isValid && key && !key.includes('PASTE')) {
+        try {
+          supabaseClient = supabase.createClient(url, key);
+          connectionAlert.classList.add('hidden');
+          loadVisitorsData();
+          return true;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // If configuration is invalid/missing
+      connectionAlert.classList.remove('hidden');
+      renderEmptyTable("A aguardar configuração de conexão da Base de Dados...");
+      return false;
+    }
+
+    function renderEmptyTable(message) {
+      visitorsTableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="px-6 py-12 text-center text-gray-500 font-medium">
+            ${message}
+          </td>
+        </tr>
+      `;
+      totalCountEl.textContent = '0';
+      activeCountEl.textContent = '0';
+      avgDurationEl.textContent = '0s';
+      topLocationEl.textContent = 'Indisponível';
+      progressBar.style.width = '0%';
+    }
+
+    // Fetch and display visitors
+    async function loadVisitorsData() {
+      if (!supabaseClient) return;
+
+      refreshSpinner.classList.remove('hidden');
+      
+      try {
+        // Fetch up to 50 visitors sorted by creation
+        const { data: visitors, error } = await supabaseClient
+          .from('visitors')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!visitors || visitors.length === 0) {
+          renderEmptyTable("Sem visitantes registados na base de dados.");
+          return;
+        }
+
+        // Render rows
+        visitorsTableBody.innerHTML = '';
+        let totalDuration = 0;
+        let activeNowCount = 0;
+        const locations = {};
+
+        visitors.forEach((v, index) => {
+          // Calculate session time duration
+          const start = new Date(v.session_start);
+          const end = v.session_end ? new Date(v.session_end) : new Date(v.created_at);
+          
+          // Duration in seconds
+          const duration = Math.max(0, Math.floor((end - start) / 1000));
+          totalDuration += duration;
+
+          // Check if active (active in the last 30 seconds)
+          const lastActiveTime = v.session_end ? new Date(v.session_end) : new Date(v.created_at);
+          const diffSeconds = Math.floor((new Date() - lastActiveTime) / 1000);
+          const isActive = diffSeconds < 30;
+          if (isActive) activeNowCount++;
+
+          // Tally locations
+          if (v.location && v.location !== 'Unknown Location') {
+            const city = v.location.split(',')[0].trim();
+            locations[city] = (locations[city] || 0) + 1;
+          }
+
+          // Format Date helper
+          const formatDate = (dateStr) => {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleTimeString('pt-PT') + ' ' + date.toLocaleDateString('pt-PT');
+          };
+
+          // Render badges
+          const deviceBadge = (dev) => {
+            const devLower = (dev || '').toLowerCase();
+            if (devLower === 'mobile') {
+              return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-300 border border-blue-800/40">Telemóvel</span>`;
+            } else if (devLower === 'tablet') {
+              return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800/40">Tablet</span>`;
+            }
+            return `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/40">Desktop</span>`;
+          };
+
+          const formatDuration = (sec) => {
+            if (sec < 60) return `${sec}s`;
+            const min = Math.floor(sec / 60);
+            const remSec = sec % 60;
+            return `${min}m ${remSec}s`;
+          };
+
+          const statusIndicator = isActive
+            ? `<span class="inline-flex items-center text-emerald-400 font-bold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-ping"></span>Activo</span>`
+            : `<span class="text-gray-500 font-medium">Inactivo</span>`;
+
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-gray-800/30 transition-colors border-b border-gray-800';
+          row.innerHTML = `
+            <td class="px-6 py-4 font-bold text-gray-400">${index + 1}</td>
+            <td class="px-6 py-4 font-mono text-gray-300 tracking-wider">${v.id}</td>
+            <td class="px-6 py-4">${deviceBadge(v.device)}</td>
+            <td class="px-6 py-4 font-semibold text-gray-200">${v.browser || '-'}</td>
+            <td class="px-6 py-4 text-gray-300 font-medium">${v.location || 'Desconhecido'}</td>
+            <td class="px-6 py-4 text-gray-400">${formatDate(v.session_start)}</td>
+            <td class="px-6 py-4 text-gray-400">${formatDate(v.session_end)}</td>
+            <td class="px-6 py-4 font-bold text-emerald-300">${formatDuration(duration)}</td>
+            <td class="px-6 py-4">${statusIndicator}</td>
+          `;
+          visitorsTableBody.appendChild(row);
+        });
+
+        // Update stats
+        const count = visitors.length;
+        totalCountEl.textContent = count;
+        activeCountEl.textContent = activeNowCount;
+        
+        // Progress bar percentage (max 10 visitors target)
+        const pct = Math.min(100, (count / 10) * 100);
+        progressBar.style.width = `${pct}%`;
+
+        // Average Duration
+        const avgSec = count > 0 ? Math.round(totalDuration / count) : 0;
+        if (avgSec < 60) {
+          avgDurationEl.textContent = `${avgSec}s`;
+        } else {
+          avgDurationEl.textContent = `${Math.floor(avgSec / 60)}m ${avgSec % 60}s`;
+        }
+
+        // Top location
+        let topLoc = 'Indisponível';
+        let maxCount = 0;
+        for (const loc in locations) {
+          if (locations[loc] > maxCount) {
+            maxCount = locations[loc];
+            topLoc = loc;
+          }
+        }
+        topLocationEl.textContent = topLoc;
+
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        renderEmptyTable(`Erro ao carregar dados da Supabase: ${err.message}`);
+      } finally {
+        refreshSpinner.classList.add('hidden');
+      }
+    }
+
+    // Initialize Page
+    initSupabaseAndLoad();
+
+    // Auto refresh every 5 seconds
+    setInterval(() => {
+      if (supabaseClient) {
+        loadVisitorsData();
+      }
+    }, 5000);
+  </script>
+</body>
+</html>
