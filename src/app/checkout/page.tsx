@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useRouter } from 'next/navigation';
 // @ts-ignore
@@ -12,7 +12,17 @@ export default function CheckoutPage() {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [deliveryMethod, setDeliveryMethod] = useState<'entrega' | 'levantamento'>('entrega');
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'flutterwave' | 'emola' | ''>('');
+
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.flutterwave.com/v3.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -41,6 +51,173 @@ export default function CheckoutPage() {
     if (!paymentMethod || !agreed) return;
     setLoading(true);
     setErrorMsg('');
+
+    if (paymentMethod === 'flutterwave') {
+      if (!(window as any).FlutterwaveCheckout) {
+        setErrorMsg('O sistema de pagamento da Flutterwave ainda está a carregar. Por favor, tente novamente em alguns segundos.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        (window as any).FlutterwaveCheckout({
+          public_key: 'FLWPUBK_TEST-5f5b1f2cd6156de9f0f229a813ba550b-X',
+          tx_ref: 'tx-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+          amount: parseFloat((cartTotal / 64).toFixed(2)),
+          currency: 'USD',
+          country: 'MZ',
+          payment_options: 'card, mobilemoney',
+          customer: {
+            email: formData.email,
+            phone_number: formData.telemovel,
+            name: formData.nome,
+          },
+          customizations: {
+            title: 'Zimpeto Wholesale',
+            description: 'Pagamento de Encomenda',
+            logo: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=150',
+          },
+          callback: async function (response: any) {
+            console.log('Flutterwave response:', response);
+            if (response.status === 'successful') {
+              try {
+                if (!supabase) {
+                  throw new Error('Cliente da Base de Dados não inicializado.');
+                }
+                const addressString = (deliveryMethod === 'entrega'
+                  ? `${formData.bairro}, ${formData.rua}, casa ${formData.numeroCasa}${formData.referencia ? ' (Ref: ' + formData.referencia + ')' : ''}`
+                  : 'Mercado do Zimpeto, Bancada 42-B, Maputo (Levantamento)') + ` [Flutterwave Ref: ${response.transaction_id || response.tx_ref}]`;
+
+                // Insert paid order
+                const { data: orderData, error: insertError } = await supabase
+                  .from('orders')
+                  .insert({
+                    customer_name: formData.nome,
+                    email: formData.email,
+                    phone: formData.telemovel,
+                    address: addressString,
+                    items: cart,
+                    total_price: cartTotal,
+                    status: 'paid'
+                  })
+                  .select()
+                  .single();
+
+
+                if (insertError) throw insertError;
+
+                // Send receipt
+                try {
+                  await fetch('/api/send-receipt', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      email: formData.email,
+                      customer_name: formData.nome,
+                      phone: formData.telemovel,
+                      address: addressString,
+                      items: cart,
+                      total_price: cartTotal,
+                      order_id: orderData.id,
+                      payment_status: 'paid'
+                    }),
+                  });
+                } catch (emailErr) {
+                  console.error('Failed to trigger email receipt:', emailErr);
+                }
+
+                clearCart();
+                window.location.href = `/thankyou.html?orderId=${orderData.id}`;
+              } catch (err: any) {
+                console.error('Failed to save paid order:', err);
+                setErrorMsg(err.message || 'Erro ao processar a encomenda. Por favor, contacte-nos.');
+                setLoading(false);
+              }
+            } else {
+              setErrorMsg('O pagamento não foi concluído. Por favor, tente novamente.');
+              setLoading(false);
+            }
+          },
+          onclose: function () {
+            console.log('Payment modal closed');
+            setLoading(false);
+          }
+        });
+      } catch (err: any) {
+        console.error('Error starting Flutterwave:', err);
+        setErrorMsg('Ocorreu um erro ao iniciar a Flutterwave.');
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (paymentMethod === 'emola') {
+      try {
+        if (!supabase) {
+          throw new Error('Cliente da Base de Dados não inicializado.');
+        }
+
+        // Format address based on delivery selection
+        const addressString = (deliveryMethod === 'entrega'
+          ? `${formData.bairro}, ${formData.rua}, casa ${formData.numeroCasa}${formData.referencia ? ' (Ref: ' + formData.referencia + ')' : ''}`
+          : 'Mercado do Zimpeto, Bancada 42-B, Maputo (Levantamento)') + ' [e-Mola]';
+
+        // 1. Insert order into Supabase
+        const { data: orderData, error: insertError } = await supabase
+          .from('orders')
+          .insert({
+            customer_name: formData.nome,
+            email: formData.email,
+            phone: formData.telemovel,
+            address: addressString,
+            items: cart,
+            total_price: cartTotal,
+            status: 'pending'
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        // 2. Trigger email receipt via send-receipt Route Handler
+        try {
+          await fetch('/api/send-receipt', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: formData.email,
+              customer_name: formData.nome,
+              phone: formData.telemovel,
+              address: addressString,
+              items: cart,
+              total_price: cartTotal,
+              order_id: orderData.id,
+              payment_status: 'pending'
+            }),
+          });
+        } catch (emailErr) {
+          console.error('Failed to trigger email receipt:', emailErr);
+        }
+
+        // 3. Display message
+        alert(`Enviaremos um pedido de pagamento e-Mola para o seu número em breve. Referência: ${orderData.id}`);
+
+        // 4. Clear shopping cart and redirect
+        clearCart();
+        window.location.href = `/thankyou.html?orderId=${orderData.id}`;
+      } catch (err: any) {
+        console.error('Checkout failed:', err);
+        setErrorMsg(err.message || 'Erro ao processar encomenda. Por favor, tente novamente.');
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       if (!supabase) {
@@ -163,8 +340,10 @@ export default function CheckoutPage() {
           )}
 
           {step === 2 && (
-            <div className="bg-white p-8 border-t-4 border-black shadow-sm animate-fadeIn">
+            <div className="bg-white p-8 border-t-4 border-black shadow-sm animate-fadeIn space-y-4">
               <h2 className="text-xl font-black uppercase italic mb-6">{t('payment_method_title')}</h2>
+              
+              {/* Mpesa payment option */}
               <div className={`p-5 border-2 cursor-pointer ${paymentMethod === 'mpesa' ? 'border-black bg-black/5' : 'border-gray-200'}`} onClick={() => setPaymentMethod('mpesa')}>
                 <span className="text-sm font-black">M-PESA VODACOM</span>
                 {paymentMethod === 'mpesa' && (
@@ -174,6 +353,30 @@ export default function CheckoutPage() {
                       <p className="uppercase">{t('mpesa_instructions_2')}</p>
                     </div>
                     <input type="tel" maxLength={9} required value={formData.mpesaNumber} onChange={handleField('mpesaNumber')} placeholder={t('confirmation_code_placeholder')} className="w-full border-b-2 py-2 text-sm font-bold outline-none" />
+                  </div>
+                )}
+              </div>
+
+              {/* Flutterwave payment option */}
+              <div className={`p-5 border-2 cursor-pointer ${paymentMethod === 'flutterwave' ? 'border-black bg-black/5' : 'border-gray-200'}`} onClick={() => setPaymentMethod('flutterwave')}>
+                <span className="text-sm font-black uppercase">{t('flutterwave_title')}</span>
+                {paymentMethod === 'flutterwave' && (
+                  <div className="mt-5 pt-4 border-t border-black space-y-3">
+                    <div className="bg-[#004d40] text-white p-4 text-[10px] font-bold">
+                      <p className="uppercase">{t('flutterwave_instructions')}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* e-Mola payment option */}
+              <div className={`p-5 border-2 cursor-pointer ${paymentMethod === 'emola' ? 'border-black bg-black/5' : 'border-gray-200'}`} onClick={() => setPaymentMethod('emola')}>
+                <span className="text-sm font-black uppercase">e-Mola</span>
+                {paymentMethod === 'emola' && (
+                  <div className="mt-5 pt-4 border-t border-black space-y-3">
+                    <div className="bg-black text-white p-4 text-[10px] font-bold">
+                      <p className="uppercase">{t('emola_instructions')}</p>
+                    </div>
                   </div>
                 )}
               </div>

@@ -169,6 +169,7 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     payment_method_title: 'Método de Pagamento',
     mpesa_instructions_1: '1. Envie o valor para: 84 000 0000 (Zimpeto Wholesale)',
     mpesa_instructions_2: '2. Após o envio, envie a confirmação de pagamento para: 84 000 0000 (Zimpeto Wholesale). E aguarde a nossa confirmação.',
+    emola_instructions: 'Enviaremos um pedido de pagamento e-Mola para o seu número em breve.',
     confirmation_code_placeholder: 'Codigo de Confirmação',
     agree_policies_label: 'Concordo com as políticas de venda',
     confirm_order_btn: 'Confirmar Encomenda →',
@@ -183,6 +184,8 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     verify_login: 'Confirmar e Entrar',
     invalid_otp: 'Código incorreto, expirado ou já utilizado.',
     email_required: 'Por favor, insira o seu email.',
+    flutterwave_title: 'Cartão / M-Pesa / Mobile Money (Flutterwave)',
+    flutterwave_instructions: 'Pague com Cartão de Crédito/Débito ou Carteira Móvel (M-Pesa/mKesh) de forma segura através da Flutterwave.',
 
     // Products
     'Arroz Don Pato (25kg)': 'Arroz Don Pato (25kg)',
@@ -436,6 +439,7 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     payment_method_title: 'Payment Method',
     mpesa_instructions_1: '1. Send the amount to: 84 000 0000 (Zimpeto Wholesale)',
     mpesa_instructions_2: '2. After sending, send the payment confirmation to: 84 000 0000 (Zimpeto Wholesale) and wait for our confirmation.',
+    emola_instructions: 'We will send an e-Mola payment request to your number shortly.',
     confirmation_code_placeholder: 'Confirmation Code',
     agree_policies_label: 'I agree to the sales policies',
     confirm_order_btn: 'Confirm Order →',
@@ -450,6 +454,8 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     verify_login: 'Verify & Login',
     invalid_otp: 'Incorrect, expired, or already used code.',
     email_required: 'Please enter your email.',
+    flutterwave_title: 'Card / M-Pesa / Mobile Money (Flutterwave)',
+    flutterwave_instructions: 'Pay securely with Credit/Debit Card or Mobile Wallet (M-Pesa/mKesh) via Flutterwave.',
 
     // Products
     'Arroz Don Pato (25kg)': 'Don Pato Rice (25kg)',
@@ -703,6 +709,7 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     payment_method_title: 'भुगतान का प्रकार',
     mpesa_instructions_1: '1. राशि भेजें: 84 000 0000 (Zimpeto Wholesale)',
     mpesa_instructions_2: '2. भेजने के बाद, भुगतान की पुष्टि भेजें: 84 000 0000 (Zimpeto Wholesale) और हमारी पुष्टि की प्रतीक्षा करें।',
+    emola_instructions: 'हम जल्द ही आपके नंबर पर ई-मोला भुगतान अनुरोध भेजेंगे।',
     confirmation_code_placeholder: 'पुष्टि कोड',
     agree_policies_label: 'मैं बिक्री नीतियों से सहमत हूँ',
     confirm_order_btn: 'ऑर्डर की पुष्टि करें →',
@@ -717,6 +724,8 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     verify_login: 'सत्यापित करें और लॉगिन करें',
     invalid_otp: 'गलत, समाप्त या पहले से उपयोग किया गया कोड।',
     email_required: 'कृपया अपना ईमेल दर्ज करें।',
+    flutterwave_title: 'कार्ड / एम-पेसा / मोबाइल मनी (फ्लटरवेव)',
+    flutterwave_instructions: 'फ्लटरवेव के माध्यम से क्रेडिट/डेबिट कार्ड या मोबाइल वॉलेट (एम-पेसा/एमकेश) से सुरक्षित भुगतान करें।',
 
     // Products
     'Arroz Don Pato (25kg)': 'डॉन पाटो चावल (25kg)',

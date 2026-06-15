@@ -17,13 +17,13 @@ function generateUUID(): string {
   });
 }
 
-// Get or create visitor ID in localStorage
+// Get or create visitor ID in sessionStorage
 function getOrCreateVisitorId(): string {
   if (typeof window === 'undefined') return '';
-  let id = localStorage.getItem('visitor_id');
+  let id = sessionStorage.getItem('visitor_id');
   if (!id) {
     id = generateUUID();
-    localStorage.setItem('visitor_id', id);
+    sessionStorage.setItem('visitor_id', id);
   }
   return id;
 }
@@ -115,60 +115,46 @@ export default function VisitorTracker() {
           initializedRef.current = true;
           console.log('Zimpeto Analytics: Returning visitor session updated.', visitorId);
         } else {
-          // Check count of unique visitors in table
-          const { count, error: countError } = await client
-            .from('visitors')
-            .select('*', { count: 'exact', head: true });
+          // Geolocation using ipapi.co
+          let location = 'Unknown Location';
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+            const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+            clearTimeout(timeoutId);
 
-          if (countError) {
-            console.error('Error counting unique visitors:', countError);
-            return;
+            if (res.ok) {
+              const ipData = await res.json();
+              if (ipData.city && ipData.country_name) {
+                location = `${ipData.city}, ${ipData.country_name}`;
+              } else if (ipData.country_name) {
+                location = ipData.country_name;
+              }
+            }
+          } catch (e) {
+            console.log('Location detection failed/timed out, using fallback.');
           }
 
-          if (count !== null && count < 10) {
-            // Geolocation using ipapi.co
-            let location = 'Unknown Location';
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-              const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
-              clearTimeout(timeoutId);
+          const device = detectDeviceType();
+          const browser = detectBrowser(navigator.userAgent);
 
-              if (res.ok) {
-                const ipData = await res.json();
-                if (ipData.city && ipData.country_name) {
-                  location = `${ipData.city}, ${ipData.country_name}`;
-                } else if (ipData.country_name) {
-                  location = ipData.country_name;
-                }
-              }
-            } catch (e) {
-              console.log('Location detection failed/timed out, using fallback.');
-            }
+          // Insert new unique visitor
+          const { error: insertError } = await client
+            .from('visitors')
+            .insert({
+              id: visitorId,
+              device,
+              browser,
+              location,
+              session_start: now,
+              session_end: now,
+              created_at: now
+            });
 
-            const device = detectDeviceType();
-            const browser = detectBrowser(navigator.userAgent);
-
-            // Insert new unique visitor
-            const { error: insertError } = await client
-              .from('visitors')
-              .insert({
-                id: visitorId,
-                device,
-                browser,
-                location,
-                session_start: now,
-                session_end: now,
-                created_at: now
-              });
-
-            if (insertError) {
-              console.error('Error registering new visitor:', insertError);
-            } else {
-              console.log('Zimpeto Analytics: New unique visitor registered.', visitorId);
-            }
+          if (insertError) {
+            console.error('Error registering new visitor:', insertError);
           } else {
-            console.log('Zimpeto Analytics: Max limit of 10 unique visitors reached. Visit ignored.', visitorId);
+            console.log('Zimpeto Analytics: New unique visitor registered.', visitorId);
           }
           
           initializedRef.current = true;

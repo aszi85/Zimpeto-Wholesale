@@ -228,24 +228,22 @@ export default function Navbar() {
                   {userEmail ? (
                     <>
                       <div className="px-4 py-2 text-[10px] text-gray-400 font-bold uppercase border-b border-gray-100">{userEmail}</div>
-                      {isAdmin && (
-                        <>
-                          <a 
-                            href="/orders.html"
-                            onClick={() => setIsAccountOpen(false)}
-                            className="block w-full text-left px-4 py-2.5 text-xs font-bold uppercase hover:bg-[#f0faf7] hover:text-[#004d40] transition-colors"
-                          >
-                            {t('minhas_encomendas')}
-                          </a>
-                          <a 
-                            href="/admin.html"
-                            onClick={() => setIsAccountOpen(false)}
-                            className="block w-full text-left px-4 py-2.5 text-xs font-bold uppercase hover:bg-[#f0faf7] hover:text-[#004d40] transition-colors"
-                          >
-                            {t('painel_visitas')}
-                          </a>
-                        </>
-                      )}
+                      <>
+                        <a 
+                          href="/orders.html"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="block w-full text-left px-4 py-2.5 text-xs font-bold uppercase hover:bg-[#f0faf7] hover:text-[#004d40] transition-colors"
+                        >
+                          {t('minhas_encomendas')}
+                        </a>
+                        <a 
+                          href="/admin.html"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="block w-full text-left px-4 py-2.5 text-xs font-bold uppercase hover:bg-[#f0faf7] hover:text-[#004d40] transition-colors"
+                        >
+                          {t('painel_visitas')}
+                        </a>
+                      </>
                       <button
                         onClick={() => { logout(); setIsAccountOpen(false); router.push('/'); }}
                         className="w-full text-left px-4 py-2.5 text-xs font-bold uppercase hover:bg-red-50 hover:text-red-600 transition-colors text-red-500 border-t border-gray-100"
@@ -341,24 +339,22 @@ export default function Navbar() {
               {userEmail ? (
                 <>
                   <div className="text-xs font-bold text-gray-500 uppercase py-1 border-b border-gray-50 px-1">{userEmail}</div>
-                  {isAdmin && (
-                    <>
-                      <a 
-                        href="/orders.html"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="text-left text-xs font-bold uppercase text-[#ff9800] py-2"
-                      >
-                        📦 {t('minhas_encomendas_painel')}
-                      </a>
-                      <a 
-                        href="/admin.html"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="text-left text-xs font-bold uppercase text-gray-400 py-2"
-                      >
-                        📊 {t('painel_visitas')}
-                      </a>
-                    </>
-                  )}
+                  <>
+                    <a 
+                      href="/orders.html"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="text-left text-xs font-bold uppercase text-[#ff9800] py-2"
+                    >
+                      📦 {t('minhas_encomendas_painel')}
+                    </a>
+                    <a 
+                      href="/admin.html"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="text-left text-xs font-bold uppercase text-gray-400 py-2"
+                    >
+                      📊 {t('painel_visitas')}
+                    </a>
+                  </>
                   <button
                     onClick={() => { logout(); setIsMenuOpen(false); router.push('/'); }}
                     className="text-left text-xs font-bold uppercase text-red-500 hover:text-red-600 py-2 border-t border-gray-50 mt-1"
