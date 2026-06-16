@@ -1,5 +1,33 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Client } from "npm:@paymentsds/mpesa@0.1.0";
+import { Client, Service } from "npm:@paymentsds/mpesa@0.1.0";
+
+// Override Service.prototype.buildResponse to support custom error properties and prevent crashes on connection failure
+if (Service && Service.prototype) {
+  Service.prototype.buildResponse = function(result: any) {
+    if (result.status >= 200 && result.status < 300) {
+      return {
+        response: {
+          status: result.status,
+          code: result.data.output_ResponseCode,
+          desc: result.data.output_ResponseDesc
+        },
+        conversation: result.data.output_ConversationID,
+        transaction: result.data.output_TransactionID,
+        reference: result.data.output_ThirdPartyReference
+      };
+    }
+
+    const responseData = result.response ? result.response.data : null;
+    return {
+      response: {
+        status: result.response ? result.response.status : 500,
+        statusText: result.response ? result.response.statusText : (result.message || 'Error'),
+        outputError: responseData ? (responseData.output_error || responseData.output_ResponseDesc || responseData.output_ResponseCode) : null,
+        data: responseData
+      }
+    };
+  };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,11 +57,11 @@ serve(async (req) => {
 
     // Initialize PaymentsDS client with the exact credentials provided
     const client = new Client({
-      apiKey: "CKyWC7LJqyqUpdtMUDx0B9oOi0KOl4cp",
-      publicKey: "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEArv9yxA69XQKBo24BaF/D+fvlqmGdYjqLQ5WtNBb5tquqGvAvG3WMFETVUSow/LizQalxj2ElMVrUmzu5mGGkxK08bWEXF7a1DEvtVJs6nppIlFJc2SnrU14AOrIrB28ogm58JjAl5BOQawOXD5dfSk7MaAA82pVHoIqEu0FxA8BOKU+RGTihRU+ptw1j4bsAJYiPbSX6i71gfPvwHPYamM0bfI4CmlsUUR3KvCG24rB6FNPcRBhM3jDuv8ae2kC33w9hEq8qNB55uw51vK7hyXoAa+U7IqP1y6nBdlN25gkxEA8yrsl1678cspeXr+3ciRyqoRgj9RD/ONbJhhxFvt1cLBh+qwK2eqISfBb06eRnNeC71oBokDm3zyCnkOtMDGl7IvnMfZfEPFCfg5QgJVk1msPpRvQxmEsrX9MQRyFVzgy2CWNIb7c+jPapyrNwoUbANlN8adU1m6yOuoX7F49x+OjiG2se0EJ6nafeKUXw/+hiJZvELUYgzKUtMAZVTNZfT8jjb58j8GVtuS+6TM2AutbejaCV84ZK58E2CRJqhmjQibEUO6KPdD7oTlEkFy52Y1uOOBXgYpqMzufNPmfdqqqSM4dU70PO8ogyKGiLAIxCetMjjm6FCMEA3Kc8K0Ig7/XtFm9By6VxTJK1Mg36TlHaZKP6VzVLXMtesJECAwEAAQ==",
+      apiKey: "sm1s6d5q93uklcz94rf5sxhp0satgbq7",
+      publicKey: "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAmptSWqV7cGUUJJhUBxsMLonux24u+FoTlrb+4Kgc6092JIszmI1QUoMohaDDXSVueXx6IXwYGsjjWY32HGXj1iQhkALXfObJ4DqXn5h6E8y5/xQYNAyd5bpN5Z8r892B6toGzZQVB7qtebH4apDjmvTi5FGZVjVYxalyyQkj4uQbbRQjgCkubSi45Xl4CGtLqZztsKssWz3mcKncgTnq3DHGYYEYiKq0xIj100LGbnvNz20Sgqmw/cH+Bua4GJsWYLEqf/h/yiMgiBbxFxsnwZl0im5vXDlwKPw+QnO2fscDhxZFAwV06bgG0oEoWm9FnjMsfvwm0rUNYFlZ+TOtCEhmhtFp+Tsx9jPCuOd5h2emGdSKD8A6jtwhNa7oQ8RtLEEqwAn44orENa1ibOkxMiiiFpmmJkwgZPOG/zMCjXIrrhDWTDUOZaPx/lEQoInJoE2i43VN/HTGCCw8dKQAwg0jsEXau5ixD0GUothqvuX3B9taoeoFAIvUPEq35YulprMM7ThdKodSHvhnwKG82dCsodRwY428kg2xM/UjiTENog4B6zzZfPhMxFlOSFX4MnrqkAS+8Jamhy1GgoHkEMrsT5+/ofjCx0HjKbT5NuA2V/lmzgJLl3jIERadLzuTYnKGWxVJcGLkWXlEPYLbiaKzbJb2sYxt+Kt5OxQqC1MCAwEAAQ==",
       serviceProviderCode: "171717",
       host: "api.sandbox.vm.co.mz",
-      origin: "zimpeto-wholesale.vercel.app",
+      origin: "developer.mpesa.vm.co.mz",
       verifySSL: false,
     });
 

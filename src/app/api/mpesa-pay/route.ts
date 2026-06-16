@@ -1,7 +1,35 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { NextResponse } from 'next/server';
 // @ts-ignore
-import { Client } from '@paymentsds/mpesa';
+import { Client, Service } from '@paymentsds/mpesa';
+
+// Override Service.prototype.buildResponse to support custom error properties and prevent crashes on connection failure
+if (Service && Service.prototype) {
+  Service.prototype.buildResponse = function(result: any) {
+    if (result.status >= 200 && result.status < 300) {
+      return {
+        response: {
+          status: result.status,
+          code: result.data.output_ResponseCode,
+          desc: result.data.output_ResponseDesc
+        },
+        conversation: result.data.output_ConversationID,
+        transaction: result.data.output_TransactionID,
+        reference: result.data.output_ThirdPartyReference
+      };
+    }
+
+    const responseData = result.response ? result.response.data : null;
+    return {
+      response: {
+        status: result.response ? result.response.status : 500,
+        statusText: result.response ? result.response.statusText : (result.message || 'Error'),
+        outputError: responseData ? (responseData.output_error || responseData.output_ResponseDesc || responseData.output_ResponseCode) : null,
+        data: responseData
+      }
+    };
+  };
+}
 
 
 export async function POST(request: Request) {
@@ -18,21 +46,13 @@ export async function POST(request: Request) {
       formattedPhone = '258' + formattedPhone;
     }
 
-    // Read M-Pesa credentials from environment variables
-    const apiKey = process.env.Mpesa_api_key || '';
-    const publicKey = process.env.Mpesa_Public_Key || '';
-
-    if (!apiKey || !publicKey) {
-      return NextResponse.json({ error: 'M-Pesa credentials not configured.' }, { status: 500 });
-    }
-
-    // Initialize PaymentsDS client with environment credentials
+    // Initialize PaymentsDS client with the exact credentials provided
     const client = new Client({
-      apiKey: apiKey,
-      publicKey: publicKey,
+      apiKey: 'sm1s6d5q93uklcz94rf5sxhp0satgbq7',
+      publicKey: 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAmptSWqV7cGUUJJhUBxsMLonux24u+FoTlrb+4Kgc6092JIszmI1QUoMohaDDXSVueXx6IXwYGsjjWY32HGXj1iQhkALXfObJ4DqXn5h6E8y5/xQYNAyd5bpN5Z8r892B6toGzZQVB7qtebH4apDjmvTi5FGZVjVYxalyyQkj4uQbbRQjgCkubSi45Xl4CGtLqZztsKssWz3mcKncgTnq3DHGYYEYiKq0xIj100LGbnvNz20Sgqmw/cH+Bua4GJsWYLEqf/h/yiMgiBbxFxsnwZl0im5vXDlwKPw+QnO2fscDhxZFAwV06bgG0oEoWm9FnjMsfvwm0rUNYFlZ+TOtCEhmhtFp+Tsx9jPCuOd5h2emGdSKD8A6jtwhNa7oQ8RtLEEqwAn44orENa1ibOkxMiiiFpmmJkwgZPOG/zMCjXIrrhDWTDUOZaPx/lEQoInJoE2i43VN/HTGCCw8dKQAwg0jsEXau5ixD0GUothqvuX3B9taoeoFAIvUPEq35YulprMM7ThdKodSHvhnwKG82dCsodRwY428kg2xM/UjiTENog4B6zzZfPhMxFlOSFX4MnrqkAS+8Jamhy1GgoHkEMrsT5+/ofjCx0HjKbT5NuA2V/lmzgJLl3jIERadLzuTYnKGWxVJcGLkWXlEPYLbiaKzbJb2sYxt+Kt5OxQqC1MCAwEAAQ==',
       serviceProviderCode: '171717',
       host: 'api.sandbox.vm.co.mz',
-      origin: 'zimpeto-wholesale.vercel.app',
+      origin: 'developer.mpesa.vm.co.mz',
       verifySSL: false
     });
 
