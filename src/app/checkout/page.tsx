@@ -12,7 +12,7 @@ export default function CheckoutPage() {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [deliveryMethod, setDeliveryMethod] = useState<'entrega' | 'levantamento'>('entrega');
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'flutterwave' | 'emola' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'flutterwave' | ''>('');
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -206,79 +206,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (paymentMethod === 'emola') {
-      try {
-        if (!supabase) {
-          throw new Error('Cliente da Base de Dados não inicializado.');
-        }
 
-        // Format address based on delivery selection
-        const addressBase = deliveryMethod === 'entrega'
-          ? `${formData.bairro}, ${formData.rua}, casa ${formData.numeroCasa}${formData.referencia ? ' (Ref: ' + formData.referencia + ')' : ''}`
-          : 'Mercado do Zimpeto, Bancada 42-B, Maputo (Levantamento)';
-
-        const addressString = addressBase + ` | Payment Info: ${JSON.stringify({
-          payment_method: 'e-Mola',
-          phone_number: formData.telemovel,
-          amount: cartTotal,
-          status: 'pending',
-          transaction_id: ''
-        })}`;
-
-        // 1. Insert order into Supabase
-        const { data: orderData, error: insertError } = await supabase
-          .from('orders')
-          .insert({
-            customer_name: formData.nome,
-            email: formData.email,
-            phone: formData.telemovel,
-            address: addressString,
-            items: cart,
-            total_price: cartTotal,
-            status: 'pending'
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          throw insertError;
-        }
-
-        // 2. Trigger email receipt via send-receipt Route Handler
-        try {
-          await fetch('/api/send-receipt', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: formData.email,
-              customer_name: formData.nome,
-              phone: formData.telemovel,
-              address: addressString,
-              items: cart,
-              total_price: cartTotal,
-              order_id: orderData.id,
-              payment_status: 'pending'
-            }),
-          });
-        } catch (emailErr) {
-          console.error('Failed to trigger email receipt:', emailErr);
-        }
-
-        // 3. Display message
-        alert(`Enviaremos um pedido de pagamento e-Mola para o seu número em breve. Referência: ${orderData.id}`);
-
-        // 4. Clear shopping cart and redirect
-        clearCart();
-        window.location.href = `/thankyou.html?orderId=${orderData.id}`;
-      } catch (err: any) {
-        console.error('Checkout failed:', err);
-        setErrorMsg(err.message || 'Erro ao processar encomenda. Por favor, tente novamente.');
-        setLoading(false);
-      }
-      return;
-    }
 
     try {
       if (!supabase) {
@@ -429,17 +357,6 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* e-Mola payment option */}
-              <div className={`p-5 border-2 cursor-pointer ${paymentMethod === 'emola' ? 'border-black bg-black/5' : 'border-gray-200'}`} onClick={() => setPaymentMethod('emola')}>
-                <span className="text-sm font-black uppercase">e-Mola</span>
-                {paymentMethod === 'emola' && (
-                  <div className="mt-5 pt-4 border-t border-black space-y-3">
-                    <div className="bg-black text-white p-4 text-[10px] font-bold">
-                      <p className="uppercase">{t('emola_instructions')}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
               
               <label className="flex items-center gap-2 mt-6 cursor-pointer">
                 <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
