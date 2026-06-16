@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Processando Pagamento | Zimpeto Wholesale</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-[#f2f2f2] text-gray-800 min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-white border-t-4 border-black p-8 rounded-lg shadow-md text-center">
+    
+    <!-- Header/Logo -->
+    <div class="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9800] mb-2">Zimpeto Wholesale</div>
+    
+    <!-- Spinner and loading status -->
+    <div id="loadingState" class="space-y-6 py-6">
+      <div class="flex justify-center">
+        <!-- Spinner -->
+        <svg class="animate-spin h-12 w-12 text-[#004d40]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <h2 class="text-lg font-black uppercase italic text-[#004d40] tracking-tight">A Processar Pagamento</h2>
+      <p class="text-sm font-semibold text-gray-700 bg-gray-50 border border-gray-200 p-4 rounded-md animate-pulse">
+        Verifique o seu telemóvel e introduza o seu PIN M-Pesa
+      </p>
+      <p class="text-xs text-gray-500">
+        Por favor, não feche nem atualize esta página. O pedido de confirmação de pagamento foi enviado para o número <span id="displayPhone" class="font-bold text-black">...</span>.
+      </p>
+    </div>
+
+    <!-- Error state (hidden by default) -->
+    <div id="errorState" class="hidden space-y-6 py-6">
+      <div class="flex justify-center">
+        <!-- Error icon -->
+        <div class="h-16 w-16 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-3xl font-bold">
+          ✕
+        </div>
+      </div>
+      <h2 class="text-lg font-black uppercase italic text-red-700 tracking-tight">Pagamento falhou. Tente novamente.</h2>
+      <p id="errorMsgText" class="text-xs text-gray-500">
+        Não conseguimos processar o pagamento com o M-Pesa. Pode ter sido rejeitado ou o tempo limite expirou.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+        <button id="retryBtn" class="flex-1 bg-[#004d40] hover:bg-[#00332c] text-white font-black uppercase text-[11px] py-3 px-6 rounded transition-colors">
+          Tentar Novamente
+        </button>
+        <a href="/loja" class="flex-1 bg-black hover:bg-black/80 text-white font-black uppercase text-[11px] py-3 px-6 rounded transition-colors flex items-center justify-center">
+          Voltar à Loja
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Supabase configuration
+    const supabaseUrl = 'https://shrxdweuypdqzoszrlwf.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNocnhkd2V1eXBkcXpvc3pybHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODc0NTQsImV4cCI6MjA5Njc2MzQ1NH0.4kraFDQdgPzVvkcb4CXMujw8ICT0fq6ybnjzOQCKwc4';
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('orderId');
+    const phone = urlParams.get('phone');
+    const amount = urlParams.get('amount');
+
+    // UI elements
+    const displayPhone = document.getElementById('displayPhone');
+    const loadingState = document.getElementById('loadingState');
+    const errorState = document.getElementById('errorState');
+    const errorMsgText = document.getElementById('errorMsgText');
+    const retryBtn = document.getElementById('retryBtn');
+
+    if (phone) {
+      displayPhone.textContent = phone;
+    }
+
+    // Run payment process
+    async function processPayment() {
+      if (!orderId || !phone || !amount) {
+        showError('Parâmetros de pagamento em falta.');
+        return;
+      }
+
+      // Reset UI state
+      loadingState.classList.remove('hidden');
+      errorState.classList.add('hidden');
+
+      try {
+        // 1. Call the backend API route for M-Pesa pay
+        const response = await fetch('/api/mpesa-pay', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: phone,
+            amount: amount,
+            order_id: orderId
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          const transactionId = data.transactionId;
+
+          // 2. Fetch the current order details from Supabase to update address correctly
+          const { data: order, error: fetchError } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .single();
+
+          if (fetchError || !order) {
+            throw new Error('Falha ao obter os detalhes do pedido no Supabase: ' + (fetchError ? fetchError.message : 'Não encontrado'));
+          }
+
+          // Extract original address prefix before the payment serialization
+          let originalAddress = order.address || '';
+          if (originalAddress.includes(' | Payment Info:')) {
+            originalAddress = originalAddress.split(' | Payment Info:')[0];
+          }
+
+          // Format updated address string with the new paid status and transactionId
+          const updatedAddressString = originalAddress + ' | Payment Info: ' + JSON.stringify({
+            payment_method: 'M-Pesa',
+            phone_number: phone,
+            amount: parseFloat(amount),
+            status: 'paid',
+            transaction_id: transactionId
+          });
+
+          // 3. Update the order in Supabase
+          const { error: updateError } = await supabaseClient
+            .from('orders')
+            .update({
+              status: 'paid',
+              address: updatedAddressString
+            })
+            .eq('id', orderId);
+
+          if (updateError) {
+            throw new Error('Falha ao atualizar o pedido no Supabase: ' + updateError.message);
+          }
+
+          // 4. Trigger email receipt
+          try {
+            await fetch('/api/send-receipt', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: order.email,
+                customer_name: order.customer_name,
+                phone: order.phone,
+                address: updatedAddressString,
+                items: order.items,
+                total_price: parseFloat(amount),
+                order_id: orderId,
+                payment_status: 'paid'
+              }),
+            });
+          } catch (receiptErr) {
+            console.error('Failed to trigger email receipt:', receiptErr);
+          }
+
+          // 5. Redirect to confirmed.html
+          window.location.href = `/confirmed.html?transactionId=${transactionId}&amount=${amount}&phone=${phone}`;
+        } else {
+          showError(data.error || 'Transação rejeitada ou falhou.');
+        }
+      } catch (err) {
+        console.error('Payment processing error:', err);
+        showError(err.message || 'Ocorreu um erro no processamento do pagamento.');
+      }
+    }
+
+    function showError(msg) {
+      loadingState.classList.add('hidden');
+      errorState.classList.remove('hidden');
+      errorMsgText.textContent = msg;
+    }
+
+    // Set up retry button
+    retryBtn.addEventListener('click', () => {
+      processPayment();
+    });
+
+    // Start payment processing on page load
+    processPayment();
+  </script>
+</body>
+</html>

@@ -52,6 +52,59 @@ export default function CheckoutPage() {
     setLoading(true);
     setErrorMsg('');
 
+    if (paymentMethod === 'mpesa') {
+      if (!formData.mpesaNumber) {
+        setErrorMsg('Por favor, introduza o número do M-Pesa.');
+        setLoading(false);
+        return;
+      }
+      try {
+        if (!supabase) {
+          throw new Error('Cliente da Base de Dados não inicializado.');
+        }
+
+        // Format address based on delivery selection
+        const addressBase = deliveryMethod === 'entrega'
+          ? `${formData.bairro}, ${formData.rua}, casa ${formData.numeroCasa}${formData.referencia ? ' (Ref: ' + formData.referencia + ')' : ''}`
+          : 'Mercado do Zimpeto, Bancada 42-B, Maputo (Levantamento)';
+
+        const addressString = addressBase + ` | Payment Info: ${JSON.stringify({
+          payment_method: 'M-Pesa',
+          phone_number: formData.mpesaNumber,
+          amount: cartTotal,
+          status: 'pending',
+          transaction_id: ''
+        })}`;
+
+        // 1. Insert order into Supabase
+        const { data: orderData, error: insertError } = await supabase
+          .from('orders')
+          .insert({
+            customer_name: formData.nome,
+            email: formData.email,
+            phone: formData.telemovel,
+            address: addressString,
+            items: cart,
+            total_price: cartTotal,
+            status: 'pending'
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        clearCart();
+        window.location.href = `/processing.html?orderId=${orderData.id}&phone=${formData.mpesaNumber}&amount=${cartTotal}`;
+      } catch (err: any) {
+        console.error('M-Pesa payment failed to initialize:', err);
+        setErrorMsg('Pagamento falhou. Tente novamente.');
+        setLoading(false);
+      }
+      return;
+    }
+
     if (paymentMethod === 'flutterwave') {
       if (!(window as any).FlutterwaveCheckout) {
         setErrorMsg('O sistema de pagamento da Flutterwave ainda está a carregar. Por favor, tente novamente em alguns segundos.');
@@ -160,9 +213,17 @@ export default function CheckoutPage() {
         }
 
         // Format address based on delivery selection
-        const addressString = (deliveryMethod === 'entrega'
+        const addressBase = deliveryMethod === 'entrega'
           ? `${formData.bairro}, ${formData.rua}, casa ${formData.numeroCasa}${formData.referencia ? ' (Ref: ' + formData.referencia + ')' : ''}`
-          : 'Mercado do Zimpeto, Bancada 42-B, Maputo (Levantamento)') + ' [e-Mola]';
+          : 'Mercado do Zimpeto, Bancada 42-B, Maputo (Levantamento)';
+
+        const addressString = addressBase + ` | Payment Info: ${JSON.stringify({
+          payment_method: 'e-Mola',
+          phone_number: formData.telemovel,
+          amount: cartTotal,
+          status: 'pending',
+          transaction_id: ''
+        })}`;
 
         // 1. Insert order into Supabase
         const { data: orderData, error: insertError } = await supabase
@@ -349,10 +410,9 @@ export default function CheckoutPage() {
                 {paymentMethod === 'mpesa' && (
                   <div className="mt-5 pt-4 border-t border-black space-y-3">
                     <div className="bg-black text-white p-4 text-[10px] font-bold">
-                      <p className="mb-2 uppercase">{t('mpesa_instructions_1')}</p>
-                      <p className="uppercase">{t('mpesa_instructions_2')}</p>
+                      <p className="uppercase">Introduza o seu número M-Pesa. Irá receber um pedido de confirmação de pagamento (PIN) no seu telemóvel.</p>
                     </div>
-                    <input type="tel" maxLength={9} required value={formData.mpesaNumber} onChange={handleField('mpesaNumber')} placeholder={t('confirmation_code_placeholder')} className="w-full border-b-2 py-2 text-sm font-bold outline-none" />
+                    <input type="tel" maxLength={9} required value={formData.mpesaNumber} onChange={handleField('mpesaNumber')} placeholder="Número de Telefone M-Pesa (ex: 841234567)" className="w-full border-b-2 py-2 text-sm font-bold outline-none" />
                   </div>
                 )}
               </div>
@@ -397,7 +457,9 @@ export default function CheckoutPage() {
                 onClick={handleConfirm} 
                 className="w-full bg-black text-white py-4 mt-6 font-black uppercase text-[11px] disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loading ? t('processing_order_btn') : t('confirm_order_btn')}
+                {loading 
+                  ? (paymentMethod === 'mpesa' ? 'Confirme o pagamento no seu telemóvel...' : t('processing_order_btn')) 
+                  : (paymentMethod === 'mpesa' ? 'Pagar com M-Pesa' : t('confirm_order_btn'))}
               </button>
             </div>
           )}

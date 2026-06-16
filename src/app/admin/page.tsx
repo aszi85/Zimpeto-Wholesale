@@ -23,7 +23,7 @@ export default function AdminRoutingPage() {
         </div>
 
         {/* Dashboard Panels Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           
           {/* Order Management Card */}
           <a
@@ -39,7 +39,7 @@ export default function AdminRoutingPage() {
               </span>
             </div>
             
-            <h2 className="text-xl font-bold uppercase italic mt-6 text-white group-hover:text-emerald-300 transition-colors">
+            <h2 className="text-xl font-bold uppercase italic mt-6 text-white group-hover:text-[#ff9800] transition-colors">
               Gestão de Encomendas
             </h2>
             <p className="text-gray-400 text-xs mt-2 leading-relaxed">
@@ -73,6 +73,32 @@ export default function AdminRoutingPage() {
             </p>
             
             <div className="mt-8 flex items-center gap-2 text-xs font-bold uppercase text-emerald-400 group-hover:gap-3 transition-all duration-300">
+              Entrar no Painel <span>→</span>
+            </div>
+          </a>
+
+          {/* Payments Monitoring Card */}
+          <a
+            href="/admin/payments.html"
+            className="group block p-8 bg-gray-900 border border-gray-800 rounded-2xl hover:border-amber-500 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(245,158,11,0.1)]"
+          >
+            <div className="flex items-start justify-between">
+              <div className="p-3 bg-gray-800 rounded-xl text-2xl group-hover:scale-110 transition-transform duration-300">
+                💳
+              </div>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 bg-gray-800 px-2.5 py-1 rounded-full group-hover:text-amber-400 transition-colors duration-300">
+                Auditoria
+              </span>
+            </div>
+            
+            <h2 className="text-xl font-bold uppercase italic mt-6 text-white group-hover:text-amber-300 transition-colors">
+              Monitoria de Pagamentos
+            </h2>
+            <p className="text-gray-400 text-xs mt-2 leading-relaxed">
+              Monitore e audite todas as transacções financeiras, incluindo M-Pesa, e-Mola, Flutterwave e estados de liquidação.
+            </p>
+            
+            <div className="mt-8 flex items-center gap-2 text-xs font-bold uppercase text-amber-400 group-hover:gap-3 transition-all duration-300">
               Entrar no Painel <span>→</span>
             </div>
           </a>

@@ -270,14 +270,18 @@
           return;
         }
 
-        // Filter unique visitors by their 6-digit prefix to ensure uniqueness, up to 10
+        // Filter unique visitors to ensure each comes from a different IP address, up to 10
         const uniqueVisitors = [];
-        const seenIds = new Set();
+        const seenIps = new Set();
         
         for (const v of visitors || []) {
-          const shortId = (v.id || '').substring(0, 6);
-          if (shortId && !seenIds.has(shortId)) {
-            seenIds.add(shortId);
+          const locStr = v.location || '';
+          const match = locStr.match(/\[([^\]]+)\]/);
+          // Fallback to shortId if no IP is embedded in the location (e.g. legacy database rows)
+          const ip = match ? match[1] : (v.id || '').substring(0, 6);
+          
+          if (ip && !seenIps.has(ip)) {
+            seenIps.add(ip);
             uniqueVisitors.push(v);
           }
           if (uniqueVisitors.length >= 10) break;
@@ -348,7 +352,7 @@
             <td class="px-6 py-4 font-mono text-gray-650 tracking-wider">${shortId}</td>
             <td class="px-6 py-4">${deviceBadge(v.device)}</td>
             <td class="px-6 py-4 font-semibold text-gray-800">${v.browser || '-'}</td>
-            <td class="px-6 py-4 text-gray-700 font-medium">${v.location || 'Desconhecido'}</td>
+            <td class="px-6 py-4 text-gray-700 font-medium">${v.location ? v.location.replace(/\[([^\]]+)\]/, '($1)') : 'Desconhecido'}</td>
             <td class="px-6 py-4 text-gray-500">${formatDate(v.session_start)}</td>
             <td class="px-6 py-4 text-gray-500">${formatDate(v.session_end)}</td>
             <td class="px-6 py-4 font-bold text-[#004d40]">${formatDuration(duration)}</td>

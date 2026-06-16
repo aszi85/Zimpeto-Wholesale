@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitoria de Pagamentos | Zimpeto Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-[#f2f2f2] text-gray-800 min-h-screen">
+  
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-6 mb-8 gap-4">
+      <div>
+        <div class="text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9800] mb-1">Zimpeto Wholesale</div>
+        <h1 class="text-3xl font-black tracking-tight text-[#004d40] uppercase italic">
+          Monitoria de Pagamentos
+        </h1>
+        <p class="text-gray-500 text-sm mt-1">Monitore e audite todas as transacções financeiras e métodos de pagamento integrados.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="refreshBtn" class="bg-[#004d40] hover:bg-[#00332c] text-white font-black uppercase text-[11px] py-2 px-4 rounded transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4 animate-spin hidden" id="refreshSpinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+          Actualizar Lista
+        </button>
+        <a href="/admin" class="bg-black hover:bg-black/80 text-white font-black uppercase text-[11px] py-2 px-4 rounded transition-colors flex items-center justify-center">
+          Painel de Controlo
+        </a>
+      </div>
+    </header>
+
+    <!-- Error Alert -->
+    <div id="connectionErrorAlert" class="hidden mb-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-xs">
+      <p class="font-bold mb-1 uppercase tracking-wider">Erro ao carregar dados do Supabase</p>
+      <p>Certifique-se de que a tabela <b>"orders"</b> está acessível e as credenciais do Supabase estão configuradas corretamente.</p>
+    </div>
+
+    <!-- Stats Summary Panel -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="bg-white border-t-4 border-[#004d40] p-5 rounded-lg shadow-sm">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Facturação Total (Paga)</span>
+        <span class="text-3xl font-black text-[#004d40] block mt-2" id="totalPaidRevenue">0 MT</span>
+        <span class="text-[10px] text-gray-500 mt-2 block">Apenas transacções confirmadas</span>
+      </div>
+      <div class="bg-white border-t-4 border-[#004d40] p-5 rounded-lg shadow-sm">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Pagamentos M-Pesa</span>
+        <span class="text-3xl font-black text-[#ff9800] block mt-2" id="mpesaCount">0</span>
+        <span class="text-[10px] text-gray-500 mt-2 block">Transacções via Vodacom M-Pesa</span>
+      </div>
+      <div class="bg-white border-t-4 border-[#004d40] p-5 rounded-lg shadow-sm">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Pagamentos e-Mola</span>
+        <span class="text-3xl font-black text-orange-600 block mt-2" id="emolaCount">0</span>
+        <span class="text-[10px] text-gray-500 mt-2 block">Transacções via Movitel e-Mola</span>
+      </div>
+      <div class="bg-white border-t-4 border-[#004d40] p-5 rounded-lg shadow-sm">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Flutterwave & Outros</span>
+        <span class="text-3xl font-black text-blue-600 block mt-2" id="otherCount">0</span>
+        <span class="text-[10px] text-gray-500 mt-2 block">Cartões de crédito e gateways externos</span>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="bg-white border-t-4 border-black rounded-lg overflow-hidden shadow-sm">
+      <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+        <h2 class="text-sm font-black uppercase tracking-wider text-gray-850">Transacções Recentes</h2>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-1.5"></span>
+          Auto-refresh (10s)
+        </span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-gray-800">
+          <thead>
+            <tr class="bg-gray-100 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              <th class="px-6 py-3">Cód. Pedido</th>
+              <th class="px-6 py-3">Data / Hora</th>
+              <th class="px-6 py-3">Método</th>
+              <th class="px-6 py-3">Telemóvel / Conta</th>
+              <th class="px-6 py-3">ID de Transacção</th>
+              <th class="px-6 py-3 text-right">Valor</th>
+              <th class="px-6 py-3 text-center">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="paymentsTableBody" class="divide-y divide-gray-200 text-xs">
+            <tr>
+              <td colspan="7" class="px-6 py-12 text-center text-gray-500 font-medium">
+                Carregando transacções...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Supabase Credentials
+    const supabaseUrl = 'https://shrxdweuypdqzoszrlwf.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNocnhkd2V1eXBkcXpvc3pybHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODc0NTQsImV4cCI6MjA5Njc2MzQ1NH0.4kraFDQdgPzVvkcb4CXMujw8ICT0fq6ybnjzOQCKwc4';
+
+    let supabaseClient = null;
+
+    // UI Elements
+    const refreshBtn = document.getElementById('refreshBtn');
+    const refreshSpinner = document.getElementById('refreshSpinner');
+    const connectionErrorAlert = document.getElementById('connectionErrorAlert');
+    const paymentsTableBody = document.getElementById('paymentsTableBody');
+    const totalPaidRevenueEl = document.getElementById('totalPaidRevenue');
+    const mpesaCountEl = document.getElementById('mpesaCount');
+    const emolaCountEl = document.getElementById('emolaCount');
+    const otherCountEl = document.getElementById('otherCount');
+
+    // Initialize Supabase
+    try {
+      supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+      loadPayments();
+      // Auto-refresh every 10 seconds
+      setInterval(loadPayments, 10000);
+    } catch (e) {
+      console.error(e);
+      connectionErrorAlert.classList.remove('hidden');
+    }
+
+    refreshBtn.addEventListener('click', () => {
+      loadPayments();
+    });
+
+    async function loadPayments() {
+      if (!supabaseClient) return;
+
+      refreshSpinner.classList.remove('hidden');
+      connectionErrorAlert.classList.add('hidden');
+
+      try {
+        const { data: orders, error } = await supabaseClient
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Parse order payment information
+        const payments = [];
+        let totalPaid = 0;
+        let mpesaCount = 0;
+        let emolaCount = 0;
+        let otherCount = 0;
+
+        orders.forEach(order => {
+          let paymentInfo = {
+            method: 'Dinheiro / Outro',
+            phone: order.phone || 'N/A',
+            transactionId: 'N/A',
+            amount: order.total_price || 0,
+            status: order.status || 'pending',
+            rawDate: order.created_at
+          };
+
+          const addressStr = order.address || '';
+          
+          if (addressStr.includes('| Payment Info:')) {
+            // New JSON-serialized pattern
+            try {
+              const jsonPart = addressStr.split('| Payment Info:')[1].trim();
+              const parsed = JSON.parse(jsonPart);
+              paymentInfo.method = parsed.payment_method || 'M-Pesa';
+              paymentInfo.phone = parsed.phone_number || order.phone || 'N/A';
+              paymentInfo.transactionId = parsed.transaction_id || 'N/A';
+              paymentInfo.amount = parsed.amount || order.total_price || 0;
+              paymentInfo.status = order.status || parsed.status || 'pending';
+            } catch (err) {
+              console.error('Error parsing payment JSON for order:', order.id, err);
+            }
+          } else if (addressStr.includes('[Flutterwave Ref:')) {
+            paymentInfo.method = 'Flutterwave';
+            paymentInfo.status = order.status || 'paid';
+            const refMatch = addressStr.match(/\[Flutterwave Ref:\s*([^\]]+)\]/);
+            paymentInfo.transactionId = refMatch ? refMatch[1] : 'N/A';
+          } else if (addressStr.includes('[e-Mola]')) {
+            paymentInfo.method = 'e-Mola';
+            paymentInfo.status = order.status || 'pending';
+          } else if (addressStr.includes('[M-Pesa]')) {
+            paymentInfo.method = 'M-Pesa';
+            paymentInfo.status = order.status || 'pending';
+          }
+
+          // Classify & Accumulate stats
+          if (paymentInfo.status === 'paid') {
+            totalPaid += paymentInfo.amount;
+          }
+
+          const methodLower = paymentInfo.method.toLowerCase();
+          if (methodLower.includes('m-pesa') || methodLower.includes('mpesa')) {
+            mpesaCount++;
+          } else if (methodLower.includes('e-mola') || methodLower.includes('emola')) {
+            emolaCount++;
+          } else {
+            otherCount++;
+          }
+
+          payments.push({
+            id: order.id,
+            ...paymentInfo
+          });
+        });
+
+        // Render Stats
+        totalPaidRevenueEl.textContent = `${totalPaid.toLocaleString('pt-MZ')} MT`;
+        mpesaCountEl.textContent = mpesaCount;
+        emolaCountEl.textContent = emolaCount;
+        otherCountEl.textContent = otherCount;
+
+        // Render Table Rows
+        if (payments.length === 0) {
+          paymentsTableBody.innerHTML = `
+            <tr>
+              <td colspan="7" class="px-6 py-8 text-center text-gray-500 font-medium">
+                Nenhum pagamento registado.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        paymentsTableBody.innerHTML = payments.map(pay => {
+          const dateStr = pay.rawDate ? new Date(pay.rawDate).toLocaleString('pt-MZ') : 'N/A';
+          const shortId = typeof pay.id === 'string' && pay.id.length > 8 ? pay.id.substring(0, 8) + '...' : pay.id;
+          
+          let statusBadge = '';
+          if (pay.status === 'paid' || pay.status === 'pago') {
+            statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Confirmado</span>`;
+          } else if (pay.status === 'pending' || pay.status === 'pendente') {
+            statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Pendente</span>`;
+          } else {
+            statusBadge = `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-800 border border-gray-200">${pay.status}</span>`;
+          }
+
+          let methodBadge = '';
+          const mLower = pay.method.toLowerCase();
+          if (mLower.includes('m-pesa') || mLower.includes('mpesa')) {
+            methodBadge = `<span class="bg-red-50 text-red-700 font-bold border border-red-200 px-2 py-0.5 rounded text-[10px]">M-Pesa</span>`;
+          } else if (mLower.includes('e-mola') || mLower.includes('emola')) {
+            methodBadge = `<span class="bg-orange-50 text-orange-700 font-bold border border-orange-200 px-2 py-0.5 rounded text-[10px]">e-Mola</span>`;
+          } else if (mLower.includes('flutterwave')) {
+            methodBadge = `<span class="bg-blue-50 text-blue-700 font-bold border border-blue-200 px-2 py-0.5 rounded text-[10px]">Flutterwave</span>`;
+          } else {
+            methodBadge = `<span class="bg-gray-150 text-gray-700 font-bold border border-gray-300 px-2 py-0.5 rounded text-[10px]">${pay.method}</span>`;
+          }
+
+          return `
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-6 py-4 font-mono font-bold text-gray-600">${shortId}</td>
+              <td class="px-6 py-4 text-gray-500">${dateStr}</td>
+              <td class="px-6 py-4">${methodBadge}</td>
+              <td class="px-6 py-4 font-semibold">${pay.phone}</td>
+              <td class="px-6 py-4 font-mono text-gray-500">${pay.transactionId}</td>
+              <td class="px-6 py-4 text-right font-black text-gray-950">${pay.amount.toLocaleString('pt-MZ')} MT</td>
+              <td class="px-6 py-4 text-center">${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Error fetching payments:', err);
+        connectionErrorAlert.classList.remove('hidden');
+        paymentsTableBody.innerHTML = `
+          <tr>
+            <td colspan="7" class="px-6 py-8 text-center text-red-500 font-medium">
+              Falha ao carregar a lista de transacções do Supabase.
+            </td>
+          </tr>
+        `;
+      } finally {
+        refreshSpinner.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

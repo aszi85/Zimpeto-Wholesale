@@ -114,6 +114,7 @@ export default function VisitorTracker() {
         } else {
           // Geolocation using ipapi.co
           let location = 'Unknown Location';
+          let ip = '127.0.0.1'; // Fallback
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
@@ -122,14 +123,34 @@ export default function VisitorTracker() {
 
             if (res.ok) {
               const ipData = await res.json();
+              ip = ipData.ip || '127.0.0.1';
               if (ipData.city && ipData.country_name) {
-                location = `${ipData.city}, ${ipData.country_name}`;
+                location = `${ipData.city}, ${ipData.country_name} [${ip}]`;
               } else if (ipData.country_name) {
-                location = ipData.country_name;
+                location = `${ipData.country_name} [${ip}]`;
+              } else {
+                location = `Unknown Location [${ip}]`;
               }
+            } else {
+              try {
+                const res2 = await fetch('https://api.ipify.org?format=json');
+                if (res2.ok) {
+                  const data2 = await res2.json();
+                  ip = data2.ip || '127.0.0.1';
+                }
+              } catch (_) {}
+              location = `Unknown Location [${ip}]`;
             }
           } catch (e) {
             console.log('Location detection failed/timed out, using fallback.');
+            try {
+              const res2 = await fetch('https://api.ipify.org?format=json');
+              if (res2.ok) {
+                const data2 = await res2.json();
+                ip = data2.ip || '127.0.0.1';
+              }
+            } catch (_) {}
+            location = `Unknown Location [${ip}]`;
           }
 
           const device = detectDeviceType();
